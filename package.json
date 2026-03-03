@@ -1,0 +1,19 @@
+{
+  "name": "domain-agnostic-playwright-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Render-first scraper that captures broad structured page data with Playwright.",
+  "bin": {
+    "scrape": "./src/index.js"
+  },
+  "scripts": {
+    "scrape": "node ./src/index.js",
+    "serve": "node ./src/server.js",
+    "start": "node ./src/main.js serve",
+    "check": "node --check ./src/index.js && node --check ./src/server.js && node --check ./src/main.js && node --check ./src/options.js && node --check ./src/scraper.js"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}
