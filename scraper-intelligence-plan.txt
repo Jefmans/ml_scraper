@@ -1,0 +1,344 @@
+SCRAPER INTELLIGENCE ROADMAP
+============================
+
+Purpose
+-------
+This document captures the phased plan for making the current Playwright-based scraper more intelligent.
+The current scraper is a strong render-first collector, but it still behaves mostly like a generic page dumper.
+The goal of this roadmap is to move from broad extraction toward page understanding, structured data output,
+safe interaction planning, and controlled crawling.
+
+
+Current Baseline
+----------------
+The existing scraper already does these things well:
+- renders JavaScript-heavy pages with Playwright
+- captures metadata, headings, text blocks, links, images, tables, forms, scripts, stylesheets, JSON-LD
+- stores cookies and browser/network observations
+- supports a CLI, browser UI, API, Docker, and Docker Compose deployment
+
+The main limitation is that it does not yet understand page intent.
+It treats most pages as large collections of DOM fragments instead of:
+- identifying the main content
+- classifying the page type
+- recognizing repeated records
+- deciding which actions are worth taking
+- normalizing values into useful structured fields
+
+
+Design Principles
+-----------------
+1. Keep the render/extract layer separate from the intelligence layer.
+2. Prefer deterministic heuristics first, then add AI only where it adds clear value.
+3. Keep each phase independently useful and deployable.
+4. Preserve existing CLI/API/UI behavior while expanding the output structure.
+5. Add bounded interaction logic, not open-ended autonomous browsing.
+
+
+Target End State
+----------------
+The scraper should eventually be able to:
+- classify what kind of page it is
+- isolate the main content region
+- extract repeated entities such as listings, cards, rows, or search results
+- decide which safe page interactions to try
+- normalize dates, prices, contacts, and other field types
+- optionally discover follow-up pages and crawl them within clear limits
+
+
+Recommended Architecture
+------------------------
+Keep src/scraper.js as the render-first extraction engine.
+Add a new intelligence layer after extraction.
+
+Suggested module layout:
+- src/intelligence/page-type.js
+- src/intelligence/main-content.js
+- src/intelligence/record-detector.js
+- src/intelligence/interaction-planner.js
+- src/intelligence/normalizers.js
+- src/intelligence/crawl-planner.js
+
+Suggested new top-level API field:
+
+{
+  "intelligence": {
+    "pageType": "listing",
+    "confidence": 0.86,
+    "mainContentSelector": "main > section.results",
+    "records": [],
+    "signals": {
+      "hasPagination": true,
+      "hasInfiniteScroll": false,
+      "hasStructuredData": true
+    }
+  }
+}
+
+
+Phase 1: Page Classification and Main Content
+---------------------------------------------
+Objective:
+Make the scraper understand what kind of page it is and where the primary content lives.
+
+Why this phase first:
+This is the highest-return upgrade because it improves nearly every later extraction step.
+
+Deliverables:
+- classify the page as one of:
+  - article
+  - product
+  - listing
+  - documentation
+  - profile
+  - search-results
+  - generic
+- attach a confidence score
+- identify the main content selector
+- return a condensed main-content block:
+  - main text
+  - main headings
+  - main links
+  - main images
+- surface intelligence signals in the API and UI
+
+Implementation ideas:
+- score candidate containers by:
+  - text density
+  - heading density
+  - link density
+  - DOM depth
+  - viewport prominence
+  - semantic tags such as main, article, section
+- classify using rule-based signals first:
+  - article: long text, few repeated sibling cards, author/date hints
+  - product: price/spec/table/buy CTA signals
+  - listing: repeated cards, pagination, similar links/images
+  - docs: navigation sidebars, many headings, code blocks
+  - profile: personal/company identity fields, contact/social links
+
+Success criteria:
+- main content is consistently cleaner than full-body extraction
+- API returns intelligence.pageType and intelligence.mainContentSelector
+- UI displays page type and confidence
+
+
+Phase 2: Repeated Record Detection
+----------------------------------
+Objective:
+Detect and extract repeated structured entities from listing-like pages.
+
+Examples:
+- ecommerce product grids
+- search result pages
+- directory cards
+- article lists
+- job boards
+
+Deliverables:
+- detect repeated sibling blocks with similar structure
+- cluster them into records
+- extract normalized record fields when present:
+  - title
+  - url
+  - image
+  - summary
+  - price
+  - location
+  - date
+  - tags
+- return:
+  - intelligence.records
+  - intelligence.recordCount
+  - intelligence.recordContainerSelector
+
+Implementation ideas:
+- compare sibling DOM nodes by tag structure and child patterns
+- score containers with:
+  - repeated links
+  - repeated images
+  - repeated headings
+  - similar class names / subtree depth
+- use field inference rules inside each record candidate
+
+Success criteria:
+- listing pages produce useful record arrays
+- result objects are materially more usable than raw links/text blocks alone
+
+
+Phase 3: Interaction Planner
+----------------------------
+Objective:
+Replace the current generic expand/scroll behavior with a safer, smarter interaction loop.
+
+Deliverables:
+- bounded interaction planner
+- action types such as:
+  - accept-consent
+  - click-load-more
+  - expand-accordion
+  - switch-tab
+  - paginate-next
+- before/after content-delta checks
+- stop conditions when no meaningful content changes occur
+- interaction trace in the output
+
+Implementation ideas:
+- identify candidate actions from visible buttons/links
+- rank actions using label and DOM context
+- execute only a limited number of actions per page
+- capture snapshots before and after each action
+- skip risky actions such as logout, purchase, or external navigation unless explicitly allowed
+
+Success criteria:
+- more hidden content is revealed without causing chaotic browsing behavior
+- output includes which actions were tried and which changed the page
+
+
+Phase 4: Semantic Normalization
+-------------------------------
+Objective:
+Convert raw scraped strings into stable structured values.
+
+Deliverables:
+- normalize dates to ISO-like formats when possible
+- normalize prices into:
+  - amount
+  - currency
+  - raw
+- normalize:
+  - phone numbers
+  - emails
+  - addresses
+  - canonical/internal URLs
+  - image URLs
+- extract and normalize key-value specs from tables or definition lists
+
+Implementation ideas:
+- build deterministic normalizers first
+- store both normalized and raw values
+- flag uncertain parses with confidence or parseStatus
+
+Success criteria:
+- downstream consumers can use normalized values directly
+- product and listing pages become much easier to process programmatically
+
+
+Phase 5: Controlled Crawl Mode
+------------------------------
+Objective:
+Expand from single-page extraction into guided multi-page collection.
+
+Deliverables:
+- optional crawl mode
+- URL discovery from:
+  - pagination links
+  - detail-page links
+  - internal navigation
+- crawl controls:
+  - max depth
+  - max pages
+  - same-domain only
+  - allow / deny patterns
+- queue and dedupe logic
+- per-page intelligence summaries
+
+Implementation ideas:
+- start from a single input URL
+- classify discovered URLs by likely value
+- prioritize detail pages and pagination
+- avoid crawling low-value assets or auth/logout endpoints
+
+Success criteria:
+- one run can collect a coherent data set from a site section, not just one page
+- crawl behavior remains bounded and predictable
+
+
+Phase 6: Targeted AI Assistance
+-------------------------------
+Objective:
+Use an LLM only where deterministic heuristics are weak or ambiguous.
+
+Important constraint:
+Do not make the LLM the core scraper.
+It should be a narrow decision-support layer, not the main extraction engine.
+
+Good uses:
+- classify ambiguous pages
+- infer labels for noisy fields
+- map extracted fragments into cleaner schema fields
+- summarize scrape results for human review
+
+Bad uses:
+- rendering pages
+- replacing deterministic DOM extraction
+- making unlimited browsing decisions
+- becoming required for every scrape
+
+Success criteria:
+- AI improves edge cases without making the baseline pipeline expensive or fragile
+
+
+Suggested Execution Order
+-------------------------
+Recommended implementation order:
+1. Phase 1: classification and main content
+2. Phase 2: repeated record detection
+3. Phase 3: interaction planner
+4. Phase 4: semantic normalization
+5. Phase 5: controlled crawl mode
+6. Phase 6: targeted AI assistance
+
+
+UI and API Changes
+------------------
+As these phases are implemented, update:
+- API response schema
+- browser UI result summary
+- history preview payload shape
+- README examples
+
+Minimum UI additions over time:
+- page type and confidence
+- detected main content selector
+- detected records table
+- interaction trace
+- normalized field preview
+
+
+Testing Strategy
+----------------
+Each phase should add validation across multiple page types.
+
+Suggested fixtures / test categories:
+- article page
+- product page
+- listing page
+- docs page
+- profile page
+- JS-heavy infinite-scroll page
+
+Recommended test types:
+- unit tests for heuristics and normalizers
+- snapshot tests for API output structure
+- end-to-end tests on a small stable set of public pages or local fixtures
+
+
+Phase 1 Build Recommendation
+----------------------------
+If work starts immediately, build this first:
+- intelligence.pageType
+- intelligence.confidence
+- intelligence.mainContentSelector
+- intelligence.mainContent summary
+- UI display for these fields
+
+This gives the largest quality improvement with the lowest complexity increase.
+
+
+Future Notes
+------------
+- Keep the intelligence layer optional and composable.
+- Prefer explainable heuristics where possible.
+- Store raw signals alongside interpreted output so debugging remains possible.
+- Avoid turning the scraper into an uncontrolled browser agent.
