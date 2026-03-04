@@ -1,0 +1,42 @@
+services:
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: playwright_scraper
+    restart: unless-stopped
+    init: true
+    ipc: host
+    ports:
+      - "${SCRAPER_BIND_IP:-0.0.0.0}:3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      BASIC_AUTH_USER: "${BASIC_AUTH_USER:-}"
+      BASIC_AUTH_PASSWORD: "${BASIC_AUTH_PASSWORD:-}"
+      BASIC_AUTH_REALM: "${BASIC_AUTH_REALM:-Field Scraper}"
+      RATE_LIMIT_MAX_REQUESTS: "${RATE_LIMIT_MAX_REQUESTS:-}"
+      RATE_LIMIT_WINDOW_MS: "${RATE_LIMIT_WINDOW_MS:-60000}"
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
+    networks:
+      - internal_backend
+    volumes:
+      - ./scrapes:/app/scrapes
+
+  portainer_agent:
+    image: portainer/agent:latest
+    container_name: portainer_agent
+    restart: always
+    profiles:
+      - ops
+    ports:
+      - "${PORTAINER_AGENT_BIND_IP:-127.0.0.1}:9001:9001"
+    networks:
+      - internal_backend
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+
+networks:
+  internal_backend:
+    name: internal_backend

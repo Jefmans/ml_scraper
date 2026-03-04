@@ -99,11 +99,39 @@ curl -X POST http://localhost:3000/api/scrape \
 
 Yes. This project can run in Docker on a server.
 
+For an actual server deployment, `docker compose` is usually easier than long `docker run` commands because it keeps the service config, ports, mounts, and auth/rate-limit settings in one file.
+
+This repository now includes [docker-compose.yml](C:\Users\Echos Bv\Desktop\Development\ml_scraper\docker-compose.yml) with:
+
+- `scraper`: the browser UI and API on port `3000`
+- `portainer_agent`: the Portainer agent on port `9001`, behind the optional `ops` profile
+
 Build the image:
 
 ```bash
 docker build -t playwright-scraper .
 ```
+
+Start the stack with Docker Compose:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Stop it:
+
+```bash
+docker compose down
+```
+
+The default compose settings:
+
+- expose the scraper on `0.0.0.0:3000`
+- bind the Portainer agent to `127.0.0.1:9001` by default, which is safer than exposing it publicly
+- mount `./scrapes` into the container at `/app/scrapes`
+- allow auth and rate limiting to be configured through `.env`
+- do not start the Portainer agent unless you opt into the `ops` profile
 
 Run the browser UI and API on a server:
 
@@ -122,6 +150,18 @@ docker run --rm --init --ipc=host -p 3000:3000 \
   -e RATE_LIMIT_MAX_REQUESTS=10 \
   -e RATE_LIMIT_WINDOW_MS=60000 \
   playwright-scraper
+```
+
+With Compose, the equivalent protected setup is just updating `.env` and starting the stack:
+
+```bash
+docker compose up -d --build
+```
+
+Start the scraper plus Portainer agent on a Linux server:
+
+```bash
+docker compose --profile ops up -d --build
 ```
 
 Run a one-off CLI scrape inside the same image:
@@ -150,6 +190,8 @@ Notes for server use:
 - `--ipc=host` avoids Chrome shared-memory issues under heavier pages.
 - The same image now supports both UI/API mode and one-off CLI scraping.
 - For public deployments, set `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`, and `RATE_LIMIT_MAX_REQUESTS`.
+- Keep the Portainer agent bound to `127.0.0.1` unless you intentionally want to expose it through a firewall or reverse tunnel.
+- The `portainer_agent` service uses Linux Docker host mounts, so it is intended for a Linux server, not a Windows Docker Desktop dev loop.
 - If you schedule scraping in cron, a queue worker, or a Kubernetes Job, mount a volume or upload the JSON to object storage after each run.
 
 ## Output shape
