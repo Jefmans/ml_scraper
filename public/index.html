@@ -20,56 +20,72 @@
       </section>
 
       <section class="workspace">
-        <form class="panel form-panel" id="scrape-form">
-          <label class="field field-url">
-            <span>Target URL</span>
-            <input
-              id="url"
-              name="url"
-              type="url"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://example.com"
-              required
-            />
-          </label>
-
-          <div class="grid">
-            <label class="field">
-              <span>Wait until</span>
-              <select id="waitUntil" name="waitUntil">
-                <option value="networkidle">networkidle</option>
-                <option value="load">load</option>
-                <option value="domcontentloaded">domcontentloaded</option>
-              </select>
+        <div class="sidebar">
+          <form class="panel form-panel" id="scrape-form">
+            <label class="field field-url">
+              <span>Target URL</span>
+              <input
+                id="url"
+                name="url"
+                type="url"
+                inputmode="url"
+                autocomplete="off"
+                placeholder="https://example.com"
+                required
+              />
             </label>
 
-            <label class="field">
-              <span>Delay (ms)</span>
-              <input id="delay" name="delay" type="number" min="0" step="100" value="1000" />
-            </label>
+            <div class="grid">
+              <label class="field">
+                <span>Wait until</span>
+                <select id="waitUntil" name="waitUntil">
+                  <option value="networkidle">networkidle</option>
+                  <option value="load">load</option>
+                  <option value="domcontentloaded">domcontentloaded</option>
+                </select>
+              </label>
 
-            <label class="field">
-              <span>Timeout (ms)</span>
-              <input id="timeout" name="timeout" type="number" min="1000" step="1000" value="45000" />
-            </label>
-          </div>
+              <label class="field">
+                <span>Delay (ms)</span>
+                <input id="delay" name="delay" type="number" min="0" step="100" value="1000" />
+              </label>
 
-          <div class="toggles">
-            <label><input id="scroll" name="scroll" type="checkbox" checked /> Auto-scroll</label>
-            <label><input id="expand" name="expand" type="checkbox" checked /> Expand content</label>
-            <label><input id="networkBodies" name="networkBodies" type="checkbox" checked /> Capture JSON bodies</label>
-            <label><input id="includeHtml" name="includeHtml" type="checkbox" /> Include HTML</label>
-            <label><input id="includeScreenshot" name="includeScreenshot" type="checkbox" /> Include screenshot</label>
-          </div>
+              <label class="field">
+                <span>Timeout (ms)</span>
+                <input id="timeout" name="timeout" type="number" min="1000" step="1000" value="45000" />
+              </label>
+            </div>
 
-          <div class="actions">
-            <button class="primary" type="submit" id="submitButton">Scrape URL</button>
-            <button class="ghost" type="button" id="downloadButton" disabled>Download JSON</button>
-          </div>
+            <div class="toggles">
+              <label><input id="scroll" name="scroll" type="checkbox" checked /> Auto-scroll</label>
+              <label><input id="expand" name="expand" type="checkbox" checked /> Expand content</label>
+              <label><input id="networkBodies" name="networkBodies" type="checkbox" checked /> Capture JSON bodies</label>
+              <label><input id="includeHtml" name="includeHtml" type="checkbox" /> Include HTML</label>
+              <label><input id="includeScreenshot" name="includeScreenshot" type="checkbox" /> Include screenshot</label>
+            </div>
 
-          <p class="status" id="statusLine">Idle. Enter a URL to begin.</p>
-        </form>
+            <div class="actions">
+              <button class="primary" type="submit" id="submitButton">Scrape URL</button>
+              <button class="ghost" type="button" id="downloadButton" disabled>Download JSON</button>
+            </div>
+
+            <p class="status" id="statusLine">Idle. Enter a URL to begin.</p>
+          </form>
+
+          <section class="panel history-panel">
+            <div class="history-header">
+              <div>
+                <p class="eyebrow history-eyebrow">Recent runs</p>
+                <h2>Scrape history</h2>
+              </div>
+              <button class="ghost compact" type="button" id="clearHistoryButton">Clear</button>
+            </div>
+
+            <div class="history-list" id="historyList">
+              <p class="history-empty" id="historyEmpty">No scrape history yet.</p>
+            </div>
+          </section>
+        </div>
 
         <section class="panel result-panel">
           <div class="summary" id="summaryCards">

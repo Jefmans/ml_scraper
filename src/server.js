@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { coerceBoolean, coerceNumber, normalizeTargetUrl } from "./options.js";
 import { scrapeUrl } from "./scraper.js";
+import { createRateLimiter, isAuthorized, resolveSecurityConfig } from "./security.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,11 +57,12 @@ export function parseServerArgs(argv) {
   return options;
 }
 
-function sendJson(response, statusCode, payload) {
+function sendJson(response, statusCode, payload, extraHeaders = {}) {
   const body = JSON.stringify(payload, null, 2);
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store"
+    "Cache-Control": "no-store",
+    ...extraHeaders
   });
   response.end(body);
 }
@@ -139,10 +141,11 @@ async function serveStaticFile(request, response, pathname) {
   }
 }
 
-function createRequestHandler() {
+function createRequestHandler(security) {
   return async (request, response) => {
     const origin = `http://${request.headers.host || "localhost"}`;
     const url = new URL(request.url || "/", origin);
+    let responseHeaders = {};
 
     try {
       if (request.method === "GET" && url.pathname === "/api/health") {
@@ -154,11 +157,35 @@ function createRequestHandler() {
         return;
       }
 
+      if (security.auth.enabled && !isAuthorized(request, security.auth)) {
+        sendJson(
+          response,
+          401,
+          { error: "Authentication required." },
+          {
+            "WWW-Authenticate": `Basic realm="${security.auth.realm}", charset="UTF-8"`
+          }
+        );
+        return;
+      }
+
       if (request.method === "POST" && url.pathname === "/api/scrape") {
+        const rateLimit = security.rateLimiter.check(request);
+        responseHeaders = rateLimit.headers;
+        if (!rateLimit.allowed) {
+          sendJson(
+            response,
+            429,
+            { error: "Rate limit exceeded. Try again later." },
+            rateLimit.headers
+          );
+          return;
+        }
+
         const body = await readJsonBody(request);
         const targetUrl = normalizeTargetUrl(body.url);
         const result = await scrapeUrl(targetUrl, mapScrapeOptions(body));
-        sendJson(response, 200, result);
+        sendJson(response, 200, result, rateLimit.headers);
         return;
       }
 
@@ -171,19 +198,25 @@ function createRequestHandler() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unexpected server error";
       const statusCode = /url|json|body|option|boolean|numeric|supported/i.test(message) ? 400 : 500;
-      sendJson(response, statusCode, { error: message });
+      sendJson(response, statusCode, { error: message }, responseHeaders);
     }
   };
 }
 
-export function createServer() {
-  return http.createServer(createRequestHandler());
+export function createServer(security = resolveSecurityConfig()) {
+  return http.createServer(
+    createRequestHandler({
+      ...security,
+      rateLimiter: createRateLimiter(security.rateLimit)
+    })
+  );
 }
 
 export async function startServer(options = {}) {
   const host = options.host || DEFAULT_HOST;
   const port = options.port ?? DEFAULT_PORT;
-  const server = createServer();
+  const security = options.security || resolveSecurityConfig();
+  const server = createServer(security);
 
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -202,9 +235,18 @@ export async function startServer(options = {}) {
 
 export async function runServer(argv = process.argv.slice(2)) {
   const options = parseServerArgs(argv);
-  const { server, host, port } = await startServer(options);
+  const security = resolveSecurityConfig();
+  const { server, host, port } = await startServer({ ...options, security });
   const displayHost = host === "0.0.0.0" ? "localhost" : host;
   process.stdout.write(`Scraper UI running at http://${displayHost}:${port}\n`);
+  if (security.auth.enabled) {
+    process.stdout.write("Basic auth enabled for UI and scrape endpoints.\n");
+  }
+  if (security.rateLimit.enabled) {
+    process.stdout.write(
+      `Rate limiting enabled: ${security.rateLimit.maxRequests} requests per ${security.rateLimit.windowMs} ms.\n`
+    );
+  }
 
   const shutdown = () => {
     server.close(() => {

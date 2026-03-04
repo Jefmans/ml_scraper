@@ -6,6 +6,7 @@ It now supports two ways to use it:
 
 - A CLI for one-off scrapes
 - A browser-based frontend backed by a local HTTP API
+- A browser UI with local scrape history
 
 ## What it captures
 
@@ -42,6 +43,8 @@ npm run serve
 
 Then open `http://localhost:3000` in your browser, paste a URL, and run the scrape from the UI.
 
+The UI keeps a local scrape history in your browser so you can reload recent runs, inspect a stored preview, and reuse prior URLs and options after refreshes.
+
 Useful flags:
 
 ```bash
@@ -64,6 +67,25 @@ The frontend is served from the same Node process as the scraper API.
 - `GET /` serves the browser UI
 - `GET /api/health` returns a simple health payload
 - `POST /api/scrape` accepts JSON with at least a `url` field
+
+## Security and rate limiting
+
+For public deployment, you can protect the UI and scrape endpoint with HTTP basic auth and apply an in-memory rate limit to `POST /api/scrape`.
+
+Environment variables:
+
+- `BASIC_AUTH_USER`: username for browser and API access
+- `BASIC_AUTH_PASSWORD`: password for browser and API access
+- `BASIC_AUTH_REALM`: optional auth realm label. Default: `Field Scraper`
+- `RATE_LIMIT_MAX_REQUESTS`: enable rate limiting with a max request count per window
+- `RATE_LIMIT_WINDOW_MS`: optional window size in milliseconds. Default: `60000`
+- `TRUST_PROXY`: set to `true` when running behind a reverse proxy and you want rate limiting to respect `X-Forwarded-For`
+
+Notes:
+
+- Basic auth applies to the UI and scrape endpoint when configured.
+- `GET /api/health` remains open for container and load balancer health checks.
+- Rate limiting is disabled unless `RATE_LIMIT_MAX_REQUESTS` is set.
 
 Example API request:
 
@@ -91,6 +113,17 @@ docker run --rm --init --ipc=host -p 3000:3000 playwright-scraper
 
 Then open `http://localhost:3000` or your server's public host on port `3000`.
 
+Run the protected server variant:
+
+```bash
+docker run --rm --init --ipc=host -p 3000:3000 \
+  -e BASIC_AUTH_USER=admin \
+  -e BASIC_AUTH_PASSWORD=change-me \
+  -e RATE_LIMIT_MAX_REQUESTS=10 \
+  -e RATE_LIMIT_WINDOW_MS=60000 \
+  playwright-scraper
+```
+
 Run a one-off CLI scrape inside the same image:
 
 ```bash
@@ -116,6 +149,7 @@ Notes for server use:
 - `--init` helps reap Chromium child processes cleanly.
 - `--ipc=host` avoids Chrome shared-memory issues under heavier pages.
 - The same image now supports both UI/API mode and one-off CLI scraping.
+- For public deployments, set `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`, and `RATE_LIMIT_MAX_REQUESTS`.
 - If you schedule scraping in cron, a queue worker, or a Kubernetes Job, mount a volume or upload the JSON to object storage after each run.
 
 ## Output shape
