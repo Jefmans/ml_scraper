@@ -128,7 +128,7 @@ docker compose down
 The default compose settings:
 
 - expose the scraper on `0.0.0.0:3000`
-- bind the Portainer agent to `127.0.0.1:9001` by default, which is safer than exposing it publicly
+- bind the Portainer agent to `0.0.0.0:9001` by default so a remote Portainer Server can reach it
 - mount `./scrapes` into the container at `/app/scrapes`
 - allow auth and rate limiting to be configured through `.env`
 - do not start the Portainer agent unless you opt into the `ops` profile
@@ -190,7 +190,7 @@ Notes for server use:
 - `--ipc=host` avoids Chrome shared-memory issues under heavier pages.
 - The same image now supports both UI/API mode and one-off CLI scraping.
 - For public deployments, set `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`, and `RATE_LIMIT_MAX_REQUESTS`.
-- Keep the Portainer agent bound to `127.0.0.1` unless you intentionally want to expose it through a firewall or reverse tunnel.
+- Restrict access to Portainer agent port `9001` at the firewall level so only your Portainer Server IP can reach it.
 - The `portainer_agent` service uses Linux Docker host mounts, so it is intended for a Linux server, not a Windows Docker Desktop dev loop.
 - If you schedule scraping in cron, a queue worker, or a Kubernetes Job, mount a volume or upload the JSON to object storage after each run.
 

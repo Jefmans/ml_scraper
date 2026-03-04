@@ -30,7 +30,7 @@ services:
     profiles:
       - ops
     ports:
-      - "${PORTAINER_AGENT_BIND_IP:-127.0.0.1}:9001:9001"
+      - "${PORTAINER_AGENT_BIND_IP:-0.0.0.0}:9001:9001"
     networks:
       - internal_backend
     volumes:
